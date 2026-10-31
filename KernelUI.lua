@@ -1,12 +1,12 @@
 --[[
     KernelUI  v1.0.0
-    Biblioteca de interface para Roblox (Luau)
+    UI library for Roblox (Luau)
 
-    Componentes: janela, abas, secoes, botao, toggle, slider, dropdown,
-    textbox, keybind, color picker, graficos, avatar 3D, notificacoes,
-    watermark (FPS / ping / usuario) e 3 temas (Dark+, White, Demon).
+    Components: window, tabs, sections, button, toggle, slider, dropdown,
+    textbox, keybind, color picker, graphs, 3D avatar, notifications,
+    watermark (FPS / ping / username) and 3 themes (Dark+, White, Demon).
 
-    Uso rapido:
+    Quick usage:
         local KernelUI = require(script.KernelUI)   -- ModuleScript
         local Window = KernelUI:CreateWindow({ Title = "KERNEL" })
         local Tab = Window:AddTab("Main")
@@ -32,14 +32,14 @@ local Lib = {
 }
 
 ---------------------------------------------------------------------------
--- TEMAS
+-- THEMES
 ---------------------------------------------------------------------------
 local function rgb(r, g, b)
 	return Color3.fromRGB(r, g, b)
 end
 
 Lib.Themes = {
-	-- preto fosco com foco no azul (padrao)
+	-- matte black with a blue accent (default)
 	["Dark+"] = {
 		Background = rgb(9, 10, 13),
 		Surface = rgb(14, 15, 20),
@@ -55,7 +55,7 @@ Lib.Themes = {
 		Warning = rgb(241, 196, 15),
 		Error = rgb(235, 64, 82),
 	},
-	-- claro
+	-- light
 	White = {
 		Background = rgb(240, 242, 247),
 		Surface = rgb(250, 251, 253),
@@ -71,7 +71,7 @@ Lib.Themes = {
 		Warning = rgb(214, 160, 0),
 		Error = rgb(214, 48, 66),
 	},
-	-- preto profundo com vermelho
+	-- deep black with a red accent
 	Demon = {
 		Background = rgb(5, 4, 5),
 		Surface = rgb(12, 9, 10),
@@ -94,9 +94,9 @@ local function TH()
 	return Lib.Themes[Lib.CurrentTheme]
 end
 
--- instancias ligadas a tokens de tema (chaves fracas: nao seguram memoria)
+-- instances bound to theme tokens (weak keys: they do not hold memory)
 local bound = setmetatable({}, { __mode = "k" })
--- callbacks de redesenho para elementos que dependem de estado
+-- redraw callbacks for elements whose look depends on state
 local hooks = {}
 
 local function bind(inst, prop, token)
@@ -171,7 +171,7 @@ function Lib:SetAccent(color)
 end
 
 ---------------------------------------------------------------------------
--- UTILITARIOS
+-- UTILITIES
 ---------------------------------------------------------------------------
 local function safe(fn, ...)
 	if type(fn) == "function" then
@@ -253,7 +253,7 @@ local function isMove(i)
 	return i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch
 end
 
--- arrastar um frame inteiro (usa conexoes temporarias: sem vazamento)
+-- drag a whole frame (uses temporary connections: no leaks)
 local function draggable(frame, handle)
 	handle.InputBegan:Connect(function(input)
 		if not isDown(input) then
@@ -277,7 +277,7 @@ local function draggable(frame, handle)
 	end)
 end
 
--- arrastar dentro de uma area, devolvendo posicao relativa (0..1)
+-- drag inside an area, returning the relative position (0..1)
 local function alphaDrag(frame, fn)
 	local function applyInput(input)
 		local p, s = frame.AbsolutePosition, frame.AbsoluteSize
@@ -332,7 +332,7 @@ local function hoverRow(f)
 end
 
 ---------------------------------------------------------------------------
--- FPS / PING (um unico loop para a lib inteira)
+-- FPS / PING (a single loop for the whole library)
 ---------------------------------------------------------------------------
 local function getPing()
 	local ok, v = pcall(function()
@@ -472,7 +472,7 @@ function Lib:SetWatermarkVisible(v)
 end
 
 ---------------------------------------------------------------------------
--- NOTIFICACOES (canto inferior direito)
+-- NOTIFICATIONS (bottom-right corner)
 ---------------------------------------------------------------------------
 local notifOrder = 0
 local TYPE_TOKEN = { Info = "Accent", Success = "Success", Warning = "Warning", Error = "Error" }
@@ -584,7 +584,7 @@ function Lib:Notify(o)
 end
 
 ---------------------------------------------------------------------------
--- CONTAINER (Tab e Section compartilham os mesmos elementos)
+-- CONTAINER (Tab and Section share the same elements)
 ---------------------------------------------------------------------------
 local Container = {}
 Container.__index = Container
@@ -1585,7 +1585,7 @@ function Container:AddAvatar(o)
 	end
 	load(o.Username or LocalPlayer.UserId)
 
-	-- interacao: arrastar para girar, scroll para zoom
+	-- interaction: drag to rotate, scroll to zoom
 	local hover, dragging = false, false
 	r.MouseEnter:Connect(function()
 		hover = true
@@ -1804,7 +1804,7 @@ function Window:Destroy()
 	end
 end
 
--- aba pronta de configuracoes (tema, accent, escala, tecla, watermark)
+-- ready-made settings tab (theme, accent, scale, key, watermark)
 function Window:AddSettingsTab()
 	local tab = self:AddTab("Settings")
 	local ui = tab:AddSection("Interface")
@@ -1884,7 +1884,7 @@ function Lib:CreateWindow(o)
 
 	local gui = makeGui("Main_" .. tostring(o.Title or "Window"), 100)
 	win.Gui = gui
-	-- marca interna de build
+	-- internal build mark
 	local BUILD = { id = "k1", a = "gustaaav0" }
 	gui:SetAttribute("_b", BUILD.a .. ":" .. BUILD.id)
 
@@ -1911,7 +1911,7 @@ function Lib:CreateWindow(o)
 	tween(scale, 0.3, { Scale = targetScale() }, Enum.EasingStyle.Back)
 	win.Main, win.Scale = main, scale
 
-	-- barra superior
+	-- top bar
 	local top = new("Frame", { Size = UDim2.new(1, 0, 0, 38), BorderSizePixel = 0, Parent = main }, { BackgroundColor3 = "Surface" })
 	local accentLine = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 2),
@@ -1982,7 +1982,7 @@ function Lib:CreateWindow(o)
 	end)
 	draggable(main, top)
 
-	-- corpo
+	-- body
 	local body = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(0, 38),
@@ -2003,7 +2003,7 @@ function Lib:CreateWindow(o)
 	})
 	new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = tabList })
 
-	-- cartao do usuario (rosto + nome)
+	-- user card (face + name)
 	local card = new("Frame", {
 		Size = UDim2.new(1, -16, 0, 44),
 		Position = UDim2.new(0, 8, 1, -52),
@@ -2050,7 +2050,7 @@ function Lib:CreateWindow(o)
 		Parent = body,
 	})
 
-	-- tecla para abrir/fechar
+	-- key to open/close
 	win:_conn(UserInputService.InputBegan, function(input, gp)
 		if gp or win.Rebinding then
 			return
@@ -2060,7 +2060,7 @@ function Lib:CreateWindow(o)
 		end
 	end)
 
-	-- ajusta ao tamanho da tela
+	-- fit to the screen size
 	local cam = workspace.CurrentCamera
 	if cam then
 		win:_conn(cam:GetPropertyChangedSignal("ViewportSize"), function()
@@ -2070,7 +2070,7 @@ function Lib:CreateWindow(o)
 		end)
 	end
 
-	-- botao flutuante para celular
+	-- floating button for mobile
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 		local tb = new("TextButton", {
 			Size = UDim2.fromOffset(42, 42),

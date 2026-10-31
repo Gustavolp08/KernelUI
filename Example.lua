@@ -1,6 +1,6 @@
--- Example.lua : exemplo completo de uso da KernelUI
+-- Example.lua : full usage example for KernelUI
 -- ModuleScript (Studio):  local KernelUI = require(script.Parent.KernelUI)
--- Hospedada:              local KernelUI = loadstring(game:HttpGet("URL_RAW_DO_SEU_GITHUB/KernelUI.lua"))()
+-- Hosted:                 local KernelUI = loadstring(game:HttpGet("RAW_URL_OF_YOUR_GITHUB/KernelUI.lua"))()
 
 local KernelUI = require(script.Parent.KernelUI)
 local RunService = game:GetService("RunService")
@@ -16,11 +16,11 @@ local Window = KernelUI:CreateWindow({
 local Main = Window:AddTab("Main")
 
 local Controls = Main:AddSection("Controls")
-Controls:AddLabel("Elementos basicos da biblioteca.")
+Controls:AddLabel("Basic elements of the library.")
 Controls:AddButton({
 	Name = "Notify me",
 	Callback = function()
-		KernelUI:Notify({ Title = "Hello", Content = "Botao clicado com sucesso.", Type = "Info", Duration = 4 })
+		KernelUI:Notify({ Title = "Hello", Content = "Button clicked successfully.", Type = "Info", Duration = 4 })
 	end,
 })
 Controls:AddToggle({
@@ -86,7 +86,7 @@ Controls:AddColorPicker({
 ---------------------------------------------------------------- Player (avatar 3D)
 local Player = Window:AddTab("Player")
 local Avatar = Player:AddSection("Avatar 3D")
-local view = Avatar:AddAvatar({ Height = 260, AutoRotate = true }) -- usuario local por padrao
+local view = Avatar:AddAvatar({ Height = 260, AutoRotate = true }) -- local user by default
 Avatar:AddTextbox({
 	Name = "Another user",
 	Placeholder = "Roblox username",
@@ -104,7 +104,7 @@ Avatar:AddToggle({
 	end,
 })
 
----------------------------------------------------------------- Stats (graficos)
+---------------------------------------------------------------- Stats (graphs)
 local Stats = Window:AddTab("Stats")
 local Graphs = Stats:AddSection("Live graphs")
 local fpsGraph = Graphs:AddGraph({ Name = "FPS", Type = "Line", Min = 0, Max = 120, Suffix = " fps" })
@@ -120,7 +120,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
----------------------------------------------------------------- Settings (pronta)
+---------------------------------------------------------------- Settings (ready-made)
 Window:AddSettingsTab()
 
 KernelUI:Notify({
