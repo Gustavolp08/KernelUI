@@ -1620,7 +1620,7 @@ function Container:AddAvatar(o)
 	local height = o.Height or 240
 	local win = self.Window
 	local tab = self.Tab
-	local useCharacter = o.UseCharacter ~= false
+	local useCharacter = o.UseCharacter == true
 	local showAccessories = o.Accessories ~= false
 
 	local r = new("Frame", {
@@ -1768,14 +1768,19 @@ function Container:AddAvatar(o)
 				caption = okN and ("@" .. uname) or tostring(userId)
 			end
 
-			-- 1) own character: already scaled and posed by the engine
+			local own = userId == LocalPlayer.UserId
 			local m = nil
-			if useCharacter and userId == LocalPlayer.UserId then
+			-- optional: clone your in-game character (only if UseCharacter = true)
+			if useCharacter and own then
 				m = cloneCharacter()
 			end
-			-- 2) any other user (or fallback): build the rig from the avatar description
+			-- default for everyone: build the rig from the Roblox avatar description
 			if not m then
 				m = buildFromDescription(userId)
+			end
+			-- last resort for yourself: the in-game character
+			if not m and own then
+				m = cloneCharacter()
 			end
 			if my ~= token or not r.Parent then
 				if m then
@@ -1824,9 +1829,12 @@ function Container:AddAvatar(o)
 					d.CanCollide = false
 				end
 			end
+			-- keep the Humanoid: shirts, pants and skin colors only render on a rig that has one
 			local hum = m:FindFirstChildOfClass("Humanoid")
 			if hum then
-				hum:Destroy()
+				pcall(function()
+					hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+				end)
 			end
 
 			model = m
@@ -1900,7 +1908,7 @@ function Container:AddAvatar(o)
 		applyAccessories()
 	end
 	-- true: your own avatar is cloned from your in-game character;
-	-- false: always built from your Roblox avatar description
+	-- false (default): built from your Roblox avatar, like any other user
 	function obj:SetUseCharacter(b)
 		useCharacter = b and true or false
 		load(currentWho)

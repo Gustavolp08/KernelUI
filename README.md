@@ -101,7 +101,7 @@ Section:AddTextbox({
 })
 ```
 
-Your own avatar is cloned from your in-game character (always correct scale and accessories). Other users are built from their Roblox avatar. If an accessory ever looks off, hide them with `view:SetAccessories(false)`, or force the Roblox-avatar build with `view:SetUseCharacter(false)`.
+Everyone (including you) is built from the Roblox avatar, with clothes, skin colors and accessories. Clothing textures can take a second to download. If an accessory ever looks off, hide them with `view:SetAccessories(false)`. Games that customize your character can be mirrored with `view:SetUseCharacter(true)`, which clones your in-game character instead.
 
 ## Graphs
 
