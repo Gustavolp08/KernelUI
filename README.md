@@ -6,6 +6,9 @@ Windows, tabs, sliders, dropdowns, color pickers, live graphs, a 3D avatar viewe
 ![version](https://img.shields.io/badge/version-1.0.0-2e7dff)
 ![language](https://img.shields.io/badge/language-Luau-blue)
 
+<img width="602" height="461" alt="image" src="https://github.com/user-attachments/assets/5e6c9db2-b8cf-4c1d-8a68-134551f1022f" />
+
+
 ---
 
 ## Features
