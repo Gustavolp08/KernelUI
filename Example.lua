@@ -1,8 +1,10 @@
 -- Example.lua : full usage example for KernelUI
--- ModuleScript (Studio):  local KernelUI = require(script.Parent.KernelUI)
--- Hosted:                 local KernelUI = loadstring(game:HttpGet("RAW_URL_OF_YOUR_GITHUB/KernelUI.lua"))()
 
-local KernelUI = require(script.Parent.KernelUI)
+-- Load from GitHub (executor):
+local KernelUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Gustavolp08/KernelUI/main/KernelUI.lua"))()
+-- Roblox Studio (ModuleScript): use this line INSTEAD of the one above
+-- local KernelUI = require(script.Parent.KernelUI)
+
 local RunService = game:GetService("RunService")
 
 local Window = KernelUI:CreateWindow({
@@ -10,6 +12,8 @@ local Window = KernelUI:CreateWindow({
 	SubTitle = "example",
 	Theme = "Dark+", -- "Dark+" | "White" | "Demon"
 	ToggleKey = Enum.KeyCode.RightShift,
+	-- Accent = Color3.fromRGB(0, 200, 120), -- optional: custom main color
+	-- Rainbow = true,                       -- optional: animated rainbow top bar
 })
 
 ---------------------------------------------------------------- Main
@@ -83,7 +87,51 @@ Controls:AddColorPicker({
 	end,
 })
 
----------------------------------------------------------------- Player (avatar 3D)
+---------------------------------------------------------------- Appearance (theme / accent / rainbow)
+local Look = Main:AddSection("Appearance")
+local accentPicker
+Look:AddDropdown({
+	Name = "Theme",
+	Options = KernelUI.ThemeOrder, -- Dark+ | White | Demon
+	Default = KernelUI.CurrentTheme,
+	Callback = function(name)
+		KernelUI:SetTheme(name)
+		accentPicker:Set(KernelUI:GetAccent(), true) -- keep the picker in sync
+	end,
+})
+accentPicker = Look:AddColorPicker({
+	Name = "Main color (accent)",
+	Default = KernelUI:GetAccent(),
+	Callback = function(color)
+		KernelUI:SetAccent(color)
+	end,
+})
+Look:AddButton({
+	Name = "Reset main color",
+	Callback = function()
+		KernelUI:ResetAccent()
+		accentPicker:Set(KernelUI:GetAccent(), true)
+	end,
+})
+Look:AddToggle({
+	Name = "Rainbow top bar",
+	Default = false,
+	Callback = function(on)
+		KernelUI:SetRainbow(on)
+	end,
+})
+Look:AddSlider({
+	Name = "Rainbow speed",
+	Min = 0.05,
+	Max = 1,
+	Default = 0.25,
+	Increment = 0.05,
+	Callback = function(v)
+		KernelUI.RainbowSpeed = v
+	end,
+})
+
+---------------------------------------------------------------- Player (3D avatar)
 local Player = Window:AddTab("Player")
 local Avatar = Player:AddSection("Avatar 3D")
 local view = Avatar:AddAvatar({ Height = 260, AutoRotate = true }) -- local user by default
@@ -96,6 +144,12 @@ Avatar:AddTextbox({
 		end
 	end,
 })
+Avatar:AddButton({
+	Name = "Back to me",
+	Callback = function()
+		view:SetUser(game:GetService("Players").LocalPlayer.UserId)
+	end,
+})
 Avatar:AddToggle({
 	Name = "Auto rotate",
 	Default = true,
@@ -103,11 +157,19 @@ Avatar:AddToggle({
 		view:SetAutoRotate(v)
 	end,
 })
+Avatar:AddToggle({
+	Name = "Show accessories",
+	Default = true,
+	Callback = function(v)
+		view:SetAccessories(v)
+	end,
+})
 
 ---------------------------------------------------------------- Stats (graphs)
 local Stats = Window:AddTab("Stats")
 local Graphs = Stats:AddSection("Live graphs")
-local fpsGraph = Graphs:AddGraph({ Name = "FPS", Type = "Line", Min = 0, Max = 120, Suffix = " fps" })
+-- no Max on purpose: the scale adjusts itself, so 320+ FPS fits too
+local fpsGraph = Graphs:AddGraph({ Name = "FPS", Type = "Line", Min = 0, Suffix = " fps" })
 local pingGraph = Graphs:AddGraph({ Name = "Ping", Type = "Bar", Min = 0, Suffix = " ms", Height = 90 })
 
 local acc = 0

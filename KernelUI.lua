@@ -1,5 +1,5 @@
 --[[
-    KernelUI  v1.0.0
+    KernelUI  v1.1.0
     UI library for Roblox (Luau)
 
     Components: window, tabs, sections, button, toggle, slider, dropdown,
@@ -23,7 +23,7 @@ local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 
 local Lib = {
-	Version = "1.0.0",
+	Version = "1.1.0",
 	Flags = {},
 	Windows = {},
 	FPS = 60,
@@ -57,19 +57,20 @@ Lib.Themes = {
 	},
 	-- light
 	White = {
-		Background = rgb(240, 242, 247),
-		Surface = rgb(250, 251, 253),
-		SurfaceAlt = rgb(255, 255, 255),
-		Hover = rgb(232, 236, 245),
-		Stroke = rgb(210, 215, 228),
+		IsLight = true,
+		Background = rgb(236, 239, 246),
+		Surface = rgb(255, 255, 255),
+		SurfaceAlt = rgb(246, 248, 252),
+		Hover = rgb(228, 234, 245),
+		Stroke = rgb(205, 212, 227),
 		Accent = rgb(36, 104, 235),
-		AccentDark = rgb(150, 185, 245),
-		Text = rgb(24, 28, 40),
-		SubText = rgb(100, 108, 128),
+		AccentDark = rgb(140, 176, 242),
+		Text = rgb(22, 26, 38),
+		SubText = rgb(92, 101, 124),
 		OnAccent = rgb(255, 255, 255),
-		Success = rgb(30, 170, 90),
-		Warning = rgb(214, 160, 0),
-		Error = rgb(214, 48, 66),
+		Success = rgb(24, 160, 84),
+		Warning = rgb(205, 150, 0),
+		Error = rgb(212, 46, 64),
 	},
 	-- deep black with a red accent
 	Demon = {
@@ -91,13 +92,47 @@ Lib.Themes = {
 Lib.ThemeOrder = { "Dark+", "White", "Demon" }
 
 local function TH()
-	return Lib.Themes[Lib.CurrentTheme]
+	return Lib.Active
 end
 
--- instances bound to theme tokens (weak keys: they do not hold memory)
-local bound = setmetatable({}, { __mode = "k" })
+-- builds the active theme table (base theme + optional accent override)
+local function buildActive()
+	local base = Lib.Themes[Lib.CurrentTheme]
+	local t = {}
+	for k, v in pairs(base) do
+		t[k] = v
+	end
+	if Lib.AccentOverride then
+		t.Accent = Lib.AccentOverride
+		if base.IsLight then
+			t.AccentDark = Lib.AccentOverride:Lerp(Color3.new(1, 1, 1), 0.55)
+		else
+			t.AccentDark = Lib.AccentOverride:Lerp(Color3.new(0, 0, 0), 0.5)
+		end
+	end
+	Lib.Active = t
+end
+buildActive()
+
+-- Instances bound to theme tokens. This table is intentionally STRONG:
+-- weak keys can silently drop live instances in some environments, which
+-- left parts of the UI un-themed. Dead instances are purged periodically.
+local bound = {}
 -- redraw callbacks for elements whose look depends on state
 local hooks = {}
+
+local function purge()
+	for inst in pairs(bound) do
+		if not inst:IsDescendantOf(game) then
+			bound[inst] = nil
+		end
+	end
+	for inst in pairs(hooks) do
+		if not inst:IsDescendantOf(game) then
+			hooks[inst] = nil
+		end
+	end
+end
 
 local function bind(inst, prop, token)
 	inst[prop] = TH()[token]
@@ -114,35 +149,36 @@ local function hook(inst, fn)
 	fn(false)
 end
 
+local function refresh(instant)
+	purge()
+	local theme = TH()
+	local info = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	for inst, props in pairs(bound) do
+		local goal = {}
+		for prop, token in pairs(props) do
+			goal[prop] = theme[token]
+		end
+		if instant then
+			for p, v in pairs(goal) do
+				inst[p] = v
+			end
+		else
+			TweenService:Create(inst, info, goal):Play()
+		end
+	end
+	for _, fn in pairs(hooks) do
+		pcall(fn, not instant)
+	end
+end
+
 function Lib:SetTheme(name, instant)
-	local theme = Lib.Themes[name]
-	if not theme then
+	if not Lib.Themes[name] then
 		return false
 	end
 	Lib.CurrentTheme = name
-	local info = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	for inst, props in pairs(bound) do
-		if inst:IsDescendantOf(game) then
-			local goal = {}
-			for prop, token in pairs(props) do
-				goal[prop] = theme[token]
-			end
-			if instant then
-				for p, v in pairs(goal) do
-					inst[p] = v
-				end
-			else
-				TweenService:Create(inst, info, goal):Play()
-			end
-		end
-	end
-	for inst, fn in pairs(hooks) do
-		if inst:IsDescendantOf(game) then
-			pcall(fn, not instant)
-		else
-			hooks[inst] = nil
-		end
-	end
+	Lib.AccentOverride = nil
+	buildActive()
+	refresh(instant)
 	return true
 end
 
@@ -163,11 +199,21 @@ function Lib:RegisterTheme(name, overrides, base)
 	table.insert(Lib.ThemeOrder, name)
 end
 
-function Lib:SetAccent(color)
-	local th = TH()
-	th.Accent = color
-	th.AccentDark = color:Lerp(Color3.new(0, 0, 0), 0.5)
-	Lib:SetTheme(Lib.CurrentTheme)
+-- changes the main (accent) color of the current theme, e.g. the blue of Dark+
+function Lib:SetAccent(color, animated)
+	Lib.AccentOverride = color
+	buildActive()
+	refresh(animated ~= true)
+end
+
+function Lib:ResetAccent()
+	Lib.AccentOverride = nil
+	buildActive()
+	refresh(false)
+end
+
+function Lib:GetAccent()
+	return TH().Accent
 end
 
 ---------------------------------------------------------------------------
@@ -306,7 +352,7 @@ local function alphaDrag(frame, fn)
 	end)
 end
 
-local function makeGui(name, order)
+local function makeGui(name, order, ignoreInset)
 	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 	local full = "KernelUI_" .. name
 	local old = playerGui:FindFirstChild(full)
@@ -318,6 +364,7 @@ local function makeGui(name, order)
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = order or 10
+	gui.IgnoreGuiInset = ignoreInset == true
 	gui.Parent = playerGui
 	return gui
 end
@@ -344,17 +391,92 @@ local function getPing()
 	return 0
 end
 
+-- decorative accent bars (window top line, watermark line) + rainbow mode
+local bars = {}
+Lib.Rainbow = false
+Lib.RainbowSpeed = 0.25
+local hue = 0
+
+local function rainbowSequence(h)
+	local pts = {}
+	for i = 0, 7 do
+		table.insert(pts, ColorSequenceKeypoint.new(i / 7, Color3.fromHSV((h + (i / 7) * 0.6) % 1, 0.8, 1)))
+	end
+	return ColorSequence.new(pts)
+end
+
+local function paintBar(bar)
+	local t = TH()
+	if Lib.Rainbow then
+		bar.Frame.BackgroundColor3 = Color3.new(1, 1, 1)
+		bar.Grad.Enabled = true
+		bar.Grad.Color = rainbowSequence(hue)
+	elseif bar.Fancy then
+		bar.Frame.BackgroundColor3 = Color3.new(1, 1, 1)
+		bar.Grad.Enabled = true
+		bar.Grad.Color = ColorSequence.new(t.Accent, t.AccentDark)
+	else
+		bar.Frame.BackgroundColor3 = t.Accent
+		bar.Grad.Enabled = false
+	end
+end
+
+local function makeBar(parent, size, fancy)
+	local f = new("Frame", {
+		Size = size,
+		BorderSizePixel = 0,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Parent = parent,
+	})
+	local g = Instance.new("UIGradient")
+	g.Parent = f
+	local bar = { Frame = f, Grad = g, Fancy = fancy }
+	table.insert(bars, bar)
+	hook(f, function()
+		paintBar(bar)
+	end)
+	return f
+end
+
+-- animated rainbow on the accent bars (window top line and watermark line)
+function Lib:SetRainbow(on, speed)
+	Lib.Rainbow = on == true
+	if speed then
+		Lib.RainbowSpeed = speed
+	end
+	for _, bar in ipairs(bars) do
+		paintBar(bar)
+	end
+end
+
 do
-	local frames, acc = 0, 0
+	local frames, acc, purgeT = 0, 0, 0
 	Lib._step = RunService.RenderStepped:Connect(function(dt)
 		frames = frames + 1
 		acc = acc + dt
+		if Lib.Rainbow and #bars > 0 then
+			hue = (hue + dt * Lib.RainbowSpeed) % 1
+			local seq = rainbowSequence(hue)
+			for _, bar in ipairs(bars) do
+				bar.Grad.Color = seq
+			end
+		end
 		if acc >= 0.5 then
 			Lib.FPS = math.floor(frames / acc + 0.5)
 			Lib.Ping = getPing()
+			purgeT = purgeT + acc
 			frames, acc = 0, 0
 			if Lib._wm then
 				Lib._wm:_update()
+			end
+			if purgeT >= 5 then
+				purgeT = 0
+				purge()
+				for i = #bars, 1, -1 do
+					if not bars[i].Frame:IsDescendantOf(game) then
+						table.remove(bars, i)
+					end
+				end
 			end
 		end
 	end)
@@ -368,13 +490,13 @@ function Lib:CreateWatermark(o)
 	if Lib._wm then
 		Lib._wm:Destroy()
 	end
-	local gui = makeGui("Watermark", 500)
+	-- IgnoreGuiInset = true: Position is relative to the whole screen. The default
+	-- sits in the top-left, right after the Roblox menu / chat buttons.
+	local gui = makeGui("Watermark", 500, true)
 	local frame = new("Frame", {
 		Name = "Watermark",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = o.Position or UDim2.new(1, -12, 0, 10),
-		Size = UDim2.fromOffset(0, 26),
-		AutomaticSize = Enum.AutomaticSize.X,
+		Position = o.Position or UDim2.fromOffset(120, 8),
+		Size = UDim2.fromOffset(120, 26),
 		BorderSizePixel = 0,
 		Active = true,
 		ClipsDescendants = true,
@@ -382,22 +504,22 @@ function Lib:CreateWatermark(o)
 	}, { BackgroundColor3 = "Surface" })
 	corner(frame, 4)
 	stroke(frame)
-	new("Frame", {
-		Size = UDim2.new(1, 0, 0, 2),
-		BorderSizePixel = 0,
-		Parent = frame,
-	}, { BackgroundColor3 = "Accent" })
+	makeBar(frame, UDim2.new(1, 0, 0, 2), false)
 	local txt = new("TextLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, 26),
-		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.fromOffset(0, 1),
 		Font = Enum.Font.Code,
 		TextSize = 13,
 		RichText = true,
 		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Center,
 		Parent = frame,
 	}, { TextColor3 = "Text" })
-	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 2), Parent = txt })
+	-- the frame grows/shrinks with the text
+	txt:GetPropertyChangedSignal("TextBounds"):Connect(function()
+		frame.Size = UDim2.fromOffset(math.ceil(txt.TextBounds.X) + 22, 26)
+	end)
 	draggable(frame, frame)
 
 	local wm = { Visible = true, Gui = gui }
@@ -445,6 +567,10 @@ function Lib:CreateWatermark(o)
 	function wm:SetTitle(t)
 		opts.Title = t
 		wm:_update()
+	end
+
+	function wm:SetPosition(pos)
+		frame.Position = pos
 	end
 
 	function wm:Destroy()
@@ -773,11 +899,11 @@ function Container:AddSlider(o)
 	local suffix = o.Suffix or ""
 	local value = math.clamp(o.Default or min, min, max)
 
-	local r = rowFrame(self, 46)
-	label(r, o.Name or "Slider", { Size = UDim2.new(1, -100, 0, 16), Position = UDim2.fromOffset(12, 6) })
+	local r = rowFrame(self, 50)
+	label(r, o.Name or "Slider", { Size = UDim2.new(1, -100, 0, 16), Position = UDim2.fromOffset(12, 7) })
 	local val = label(r, "", {
 		Size = UDim2.fromOffset(80, 16),
-		Position = UDim2.new(1, -92, 0, 6),
+		Position = UDim2.new(1, -92, 0, 7),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		Font = Enum.Font.Code,
 		TextSize = 12,
@@ -785,27 +911,26 @@ function Container:AddSlider(o)
 	local hit = new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, -24, 0, 20),
-		Position = UDim2.fromOffset(12, 22),
+		Position = UDim2.fromOffset(12, 26),
 		Parent = r,
 	})
+	-- rectangular track with a filled, shaded bar
 	local bar = new("Frame", {
-		Size = UDim2.new(1, 0, 0, 6),
-		Position = UDim2.new(0, 0, 0.5, -3),
+		Size = UDim2.new(1, 0, 0, 12),
+		Position = UDim2.new(0, 0, 0.5, -6),
 		BorderSizePixel = 0,
+		ClipsDescendants = true,
 		Parent = hit,
-	}, { BackgroundColor3 = "Stroke" })
+	}, { BackgroundColor3 = "Background" })
 	corner(bar, 3)
+	stroke(bar)
 	local fill = new("Frame", { Size = UDim2.fromScale(0, 1), BorderSizePixel = 0, Parent = bar }, { BackgroundColor3 = "Accent" })
 	corner(fill, 3)
-	local knob = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Size = UDim2.fromOffset(12, 12),
-		Position = UDim2.fromScale(1, 0.5),
-		BorderSizePixel = 0,
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(175, 175, 175)),
 		Parent = fill,
-	}, { BackgroundColor3 = "OnAccent" })
-	corner(knob, 6)
-	stroke(knob, "Accent", 2)
+	})
 
 	local function fmt(v)
 		return string.format("%." .. dec .. "f", v) .. suffix
@@ -1367,6 +1492,9 @@ function Container:AddGraph(o)
 			lo = fixedMin or (mn - padv)
 			hi = fixedMax or (mx + padv)
 		end
+		if hi - lo < 1e-6 then
+			hi = lo + 1
+		end
 		rangeHi.Text = string.format("%.0f", hi)
 		rangeLo.Text = string.format("%.0f", lo)
 		local function yOf(x)
@@ -1440,11 +1568,60 @@ function Container:AddGraph(o)
 	return obj
 end
 
+-- body parts used to frame the camera (accessories are ignored on purpose,
+-- so a huge hat or wing never pushes the camera away)
+local BODY_PARTS = {
+	Head = true, UpperTorso = true, LowerTorso = true,
+	LeftUpperArm = true, LeftLowerArm = true, LeftHand = true,
+	RightUpperArm = true, RightLowerArm = true, RightHand = true,
+	LeftUpperLeg = true, LeftLowerLeg = true, LeftFoot = true,
+	RightUpperLeg = true, RightLowerLeg = true, RightFoot = true,
+	Torso = true, ["Left Arm"] = true, ["Right Arm"] = true,
+	["Left Leg"] = true, ["Right Leg"] = true,
+}
+
+local function removeClutter(model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("Tool") or d:IsA("LuaSourceContainer") or d:IsA("BillboardGui")
+			or d:IsA("Sound") or d:IsA("ForceField") or d:IsA("Highlight") then
+			d:Destroy()
+		end
+	end
+end
+
+local function bodyBounds(model)
+	local mn = Vector3.new(math.huge, math.huge, math.huge)
+	local mx = Vector3.new(-math.huge, -math.huge, -math.huge)
+	local found = false
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and BODY_PARTS[d.Name] then
+			found = true
+			local cf, half = d.CFrame, d.Size / 2
+			for x = -1, 1, 2 do
+				for y = -1, 1, 2 do
+					for z = -1, 1, 2 do
+						local p = cf:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
+						mn = Vector3.new(math.min(mn.X, p.X), math.min(mn.Y, p.Y), math.min(mn.Z, p.Z))
+						mx = Vector3.new(math.max(mx.X, p.X), math.max(mx.Y, p.Y), math.max(mx.Z, p.Z))
+					end
+				end
+			end
+		end
+	end
+	if not found then
+		local cf, size = model:GetBoundingBox()
+		return cf.Position, size
+	end
+	return (mn + mx) / 2, mx - mn
+end
+
 function Container:AddAvatar(o)
 	o = o or {}
 	local height = o.Height or 240
 	local win = self.Window
 	local tab = self.Tab
+	local useCharacter = o.UseCharacter ~= false
+	local showAccessories = o.Accessories ~= false
 
 	local r = new("Frame", {
 		Size = UDim2.new(1, 0, 0, height),
@@ -1467,6 +1644,10 @@ function Container:AddAvatar(o)
 	cam.FieldOfView = 32
 	cam.Parent = vp
 	vp.CurrentCamera = cam
+	-- accessory welds and body scale only resolve when the rig goes through a
+	-- physics step, so the rig lives inside a WorldModel
+	local world = Instance.new("WorldModel")
+	world.Parent = vp
 
 	local status = label(r, "loading avatar...", {
 		Size = UDim2.new(1, 0, 1, -34),
@@ -1489,11 +1670,13 @@ function Container:AddAvatar(o)
 		TextSize = 10,
 	}, "SubText")
 
-	local model, center, size = nil, Vector3.new(), Vector3.new(4, 6, 2)
+	local model, accessories = nil, {}
+	local center, size = Vector3.new(), Vector3.new(4, 6, 2)
 	local yaw, dist, zoom = math.pi, 10, 1
 	local auto = o.AutoRotate ~= false
 	local speed = o.Speed or 0.7
 	local token = 0
+	local currentWho = nil
 
 	local function placeCamera()
 		if not model then
@@ -1503,16 +1686,64 @@ function Container:AddAvatar(o)
 		cam.CFrame = CFrame.lookAt(pos, center)
 	end
 
+	local function frameCamera()
+		local fov = math.rad(cam.FieldOfView)
+		local aspect = math.max(vp.AbsoluteSize.X, 1) / math.max(vp.AbsoluteSize.Y, 1)
+		local wide = math.max(size.X, size.Z)
+		local distH = (math.max(size.Y, 1) * 1.28 / 2) / math.tan(fov / 2)
+		local distW = (wide * 1.3 / 2) / (math.tan(fov / 2) * aspect)
+		dist = math.max(distH, distW) + wide / 2
+	end
+
+	local function clearModel()
+		if model then
+			model:Destroy()
+		end
+		model, accessories = nil, {}
+	end
+
+	local function applyAccessories()
+		for _, acc in ipairs(accessories) do
+			acc.Parent = showAccessories and model or nil
+		end
+	end
+
+	local function cloneCharacter()
+		local ch = LocalPlayer.Character
+		if not ch or not ch:FindFirstChild("HumanoidRootPart") then
+			return nil
+		end
+		local was = ch.Archivable
+		ch.Archivable = true
+		local ok, c = pcall(function()
+			return ch:Clone()
+		end)
+		ch.Archivable = was
+		return ok and c or nil
+	end
+
+	local function buildFromDescription(userId)
+		local okD, desc = pcall(function()
+			return Players:GetHumanoidDescriptionFromUserId(userId)
+		end)
+		if not (okD and desc) then
+			return nil
+		end
+		local okM, built = pcall(function()
+			return Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
+		end)
+		return okM and built or nil
+	end
+
 	local function load(who)
 		token = token + 1
 		local my = token
+		currentWho = who
 		status.Visible = true
 		status.Text = "loading avatar..."
 		nameLbl.Text = ""
-		if model then
-			model:Destroy()
-			model = nil
-		end
+		vp.Visible = false
+		clearModel()
 		task.spawn(function()
 			local userId = who
 			if type(userId) == "string" then
@@ -1527,34 +1758,24 @@ function Container:AddAvatar(o)
 				end
 				return
 			end
-			local label2 = ""
+			local caption
 			if userId == LocalPlayer.UserId then
-				label2 = LocalPlayer.DisplayName .. "  (@" .. LocalPlayer.Name .. ")"
+				caption = LocalPlayer.DisplayName .. "  (@" .. LocalPlayer.Name .. ")"
 			else
 				local okN, uname = pcall(function()
 					return Players:GetNameFromUserIdAsync(userId)
 				end)
-				label2 = okN and ("@" .. uname) or tostring(userId)
+				caption = okN and ("@" .. uname) or tostring(userId)
 			end
 
+			-- 1) own character: already scaled and posed by the engine
 			local m = nil
-			local okD, desc = pcall(function()
-				return Players:GetHumanoidDescriptionFromUserId(userId)
-			end)
-			if okD and desc then
-				local okM, built = pcall(function()
-					return Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
-				end)
-				if okM then
-					m = built
-				end
+			if useCharacter and userId == LocalPlayer.UserId then
+				m = cloneCharacter()
 			end
-			if not m and userId == LocalPlayer.UserId and LocalPlayer.Character then
-				local ch = LocalPlayer.Character
-				local was = ch.Archivable
-				ch.Archivable = true
-				m = ch:Clone()
-				ch.Archivable = was
+			-- 2) any other user (or fallback): build the rig from the avatar description
+			if not m then
+				m = buildFromDescription(userId)
 			end
 			if my ~= token or not r.Parent then
 				if m then
@@ -1566,20 +1787,61 @@ function Container:AddAvatar(o)
 				status.Text = "avatar unavailable"
 				return
 			end
+
+			removeClutter(m)
+			for _, d in ipairs(m:GetDescendants()) do
+				if d:IsA("Motor6D") then
+					pcall(function()
+						d.Transform = CFrame.new() -- neutral pose (no animation frame)
+					end)
+				end
+			end
+			local hrp = m:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.Anchored = true -- keeps the rig from falling while the joints settle
+			end
+			pcall(function()
+				m:PivotTo(CFrame.new(0, 0, 0))
+			end)
+			m.Parent = world
+
+			-- let accessory welds / scale resolve through physics
+			for _ = 1, 2 do
+				RunService.Heartbeat:Wait()
+				pcall(function()
+					world:StepPhysics(1 / 30, { m })
+				end)
+			end
+			if my ~= token or not r.Parent then
+				m:Destroy()
+				return
+			end
+
+			-- freeze the final pose
 			for _, d in ipairs(m:GetDescendants()) do
 				if d:IsA("BasePart") then
 					d.Anchored = true
-				elseif d:IsA("LuaSourceContainer") then
-					d:Destroy()
+					d.CanCollide = false
 				end
 			end
-			m:PivotTo(CFrame.new(0, 0, 0))
-			m.Parent = vp
-			local cf, sz = m:GetBoundingBox()
-			model, center, size = m, cf.Position, sz
-			dist = (sz.Y / 2) / math.tan(math.rad(cam.FieldOfView / 2)) * 1.35
+			local hum = m:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum:Destroy()
+			end
+
+			model = m
+			accessories = {}
+			for _, c in ipairs(m:GetChildren()) do
+				if c:IsA("Accessory") then
+					table.insert(accessories, c)
+				end
+			end
+			applyAccessories()
+			center, size = bodyBounds(m)
+			frameCamera()
 			status.Visible = false
-			nameLbl.Text = label2
+			vp.Visible = true
+			nameLbl.Text = caption
 			placeCamera()
 		end)
 	end
@@ -1632,6 +1894,16 @@ function Container:AddAvatar(o)
 	end
 	function obj:SetSpeed(x)
 		speed = x
+	end
+	function obj:SetAccessories(b)
+		showAccessories = b and true or false
+		applyAccessories()
+	end
+	-- true: your own avatar is cloned from your in-game character;
+	-- false: always built from your Roblox avatar description
+	function obj:SetUseCharacter(b)
+		useCharacter = b and true or false
+		load(currentWho)
 	end
 	function obj:ResetView()
 		yaw, zoom = math.pi, 1
@@ -1807,22 +2079,53 @@ end
 -- ready-made settings tab (theme, accent, scale, key, watermark)
 function Window:AddSettingsTab()
 	local tab = self:AddTab("Settings")
-	local ui = tab:AddSection("Interface")
-	ui:AddDropdown({
+
+	local look = tab:AddSection("Appearance")
+	local accentPicker
+	look:AddDropdown({
 		Name = "Theme",
 		Options = Lib.ThemeOrder,
 		Default = Lib.CurrentTheme,
 		Callback = function(v)
 			Lib:SetTheme(v)
+			if accentPicker then
+				accentPicker:Set(Lib:GetAccent(), true)
+			end
 		end,
 	})
-	ui:AddColorPicker({
+	accentPicker = look:AddColorPicker({
 		Name = "Accent color",
-		Default = TH().Accent,
+		Default = Lib:GetAccent(),
 		Callback = function(c)
 			Lib:SetAccent(c)
 		end,
 	})
+	look:AddButton({
+		Name = "Reset accent color",
+		Callback = function()
+			Lib:ResetAccent()
+			accentPicker:Set(Lib:GetAccent(), true)
+		end,
+	})
+	look:AddToggle({
+		Name = "Rainbow top bar",
+		Default = Lib.Rainbow,
+		Callback = function(v)
+			Lib:SetRainbow(v)
+		end,
+	})
+	look:AddSlider({
+		Name = "Rainbow speed",
+		Min = 0.05,
+		Max = 1,
+		Default = Lib.RainbowSpeed,
+		Increment = 0.05,
+		Callback = function(v)
+			Lib.RainbowSpeed = v
+		end,
+	})
+
+	local ui = tab:AddSection("Interface")
 	ui:AddSlider({
 		Name = "UI scale",
 		Min = 0.7,
@@ -1849,6 +2152,7 @@ function Window:AddSettingsTab()
 			Lib:SetWatermarkVisible(v)
 		end,
 	})
+
 	local sys = tab:AddSection("System")
 	sys:AddButton({
 		Name = "Test notification",
@@ -1869,6 +2173,12 @@ function Lib:CreateWindow(o)
 	o = o or {}
 	if o.Theme then
 		Lib:SetTheme(o.Theme, true)
+	end
+	if o.Accent then
+		Lib:SetAccent(o.Accent)
+	end
+	if o.Rainbow ~= nil then
+		Lib:SetRainbow(o.Rainbow)
 	end
 	local win = setmetatable({
 		_conns = {},
@@ -1913,16 +2223,7 @@ function Lib:CreateWindow(o)
 
 	-- top bar
 	local top = new("Frame", { Size = UDim2.new(1, 0, 0, 38), BorderSizePixel = 0, Parent = main }, { BackgroundColor3 = "Surface" })
-	local accentLine = new("Frame", {
-		Size = UDim2.new(1, 0, 0, 2),
-		BorderSizePixel = 0,
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		Parent = top,
-	})
-	local grad = new("UIGradient", { Parent = accentLine })
-	hook(accentLine, function()
-		grad.Color = ColorSequence.new(TH().Accent, TH().AccentDark)
-	end)
+	makeBar(top, UDim2.new(1, 0, 0, 2), true)
 	new("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BorderSizePixel = 0, Parent = top }, { BackgroundColor3 = "Stroke" })
 
 	local titleBox = new("Frame", {
